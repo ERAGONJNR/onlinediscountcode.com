@@ -10,7 +10,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET; // Replace with a secure secret
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
 const PORT = 3000;
@@ -18,7 +18,7 @@ const PORT = 3000;
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'))); // Serve static files
 app.set('view engine', 'ejs');
 app.set("views", path.join(__dirname, "views"));
 
@@ -26,38 +26,29 @@ app.set("views", path.join(__dirname, "views"));
 mongoose.connect(process.env.MONGO_URI)
     .then(() => {
         console.log('Connected to MongoDB');
-        // seedAdmin();
     })
     .catch(err => console.error('Error connecting to MongoDB:', err));
 
-// API Routes
-app.get('/', (req, res) => {
-    res.render('index');
+// Static Page Routes
+app.get('/', (req, res) => res.render('index'));
+app.get('/adminLogin', (req, res) => res.render('adminLogin'));
+app.get('/about', (req, res) => res.render('about'));
+app.get('/categories', (req, res) => res.render('categories'));
+app.get('/contact', (req, res) => res.render('contact'));
+app.get('/privacy', (req, res) => res.render('privacy'));
+app.get('/termsAndCond', (req, res) => res.render('termsAndCond'));
+app.get('/affiliate', (req, res) => res.render('affiliate'));
+app.get('/adminDashboard', (req, res) => res.render('adminDashboard'));
+
+// Serve robots.txt and sitemap.xml
+app.get('/robots.txt', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'robots.txt'));
 });
-app.get('/adminLogin', (req, res) => {
-    res.render('adminLogin');
+
+app.get('/sitemap.xml', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'sitemap.xml'));
 });
-app.get('/about', (req, res) => {
-    res.render('about');
-});
-app.get('/categories', (req, res) => {
-    res.render('categories');
-});
-app.get('/contact', (req, res) => {
-    res.render('contact');
-});
-app.get('/privacy', (req, res) => {
-    res.render('privacy');
-});
-app.get('/termsAndCond', (req, res) => {
-    res.render('termsAndCond');
-});
-app.get('/affiliate', (req, res) => {
-    res.render('affiliate');
-});
-app.get('/adminDashboard', (req, res) => {
-    res.render('adminDashboard');
-});
+
 // Token validation endpoint
 app.get('/api/admin/validateToken', authenticateToken, (req, res) => {
     res.status(200).json({ message: 'Token is valid' });
@@ -66,22 +57,15 @@ app.get('/api/admin/validateToken', authenticateToken, (req, res) => {
 // Middleware for authentication
 function authenticateToken(req, res, next) {
     const authorizationHeader = req.headers['authorization'];
-    
-    // Check if the authorization header is present
     if (!authorizationHeader) return res.status(403).json({ error: 'Access denied' });
 
-    // Split the string to get the token (the second part after "Bearer")
     const token = authorizationHeader.split(' ')[1];
-
-    // If token is missing, deny access
     if (!token) return res.status(403).json({ error: 'Access denied' });
 
-    // Verify the token
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) return res.status(403).json({ error: 'Invalid token' });
-        
-        req.user = user; // Attach user to the request object
-        next(); // Proceed to the next middleware/route handler
+        req.user = user;
+        next();
     });
 }
 
@@ -103,38 +87,19 @@ app.post('/api/admin/login', async (req, res) => {
     }
 });
 
-// Seed admin data
-// const seedAdmin = async () => {
-//     try {
-//         const existingAdmin = await Admin.findOne({ username: 'admin_username' });
-//         if (existingAdmin) {
-//             console.log('Admin already exists');
-//             return;
-//         }
-
-//         const hashedPassword = await bcrypt.hash('admin_pwd', 10);
-//         const admin = new Admin({ username: 'admin_username', password: hashedPassword });
-//         await admin.save();
-//         console.log('Admin created');
-//     } catch (err) {
-//         console.error('Error seeding admin:', err);
-//     }
-// };
-
-// Get all coupons for the admin dashboard
+// Coupons API
 app.get('/api/coupons', (req, res) => {
     Coupon.find()
         .then((coupons) => res.json(coupons))
         .catch((err) => res.status(500).json({ error: 'Error fetching coupons' }));
 });
 
-// Add a new coupon
 app.post('/api/coupons', (req, res) => {
-    const { offer, code, link } = req.body; // Include link
+    const { offer, code, link } = req.body;
     const newCoupon = new Coupon({
         offer,
         code,
-        link, // Save the link
+        link,
         used: 0,
         today: 0,
         thumbsUp: 0,
@@ -146,17 +111,15 @@ app.post('/api/coupons', (req, res) => {
         .catch((err) => res.status(500).json({ error: 'Error adding coupon' }));
 });
 
-// Edit a coupon's details
 app.put('/api/coupons/:id', (req, res) => {
     const couponId = req.params.id;
-    const { offer, code, link } = req.body; // Include link
+    const { offer, code, link } = req.body;
 
     Coupon.findByIdAndUpdate(couponId, { offer, code, link }, { new: true })
         .then(updatedCoupon => res.json(updatedCoupon))
         .catch((err) => res.status(500).json({ error: 'Error updating coupon' }));
 });
 
-// Delete a coupon
 app.delete('/api/coupons/:id', (req, res) => {
     const couponId = req.params.id;
 
@@ -165,7 +128,6 @@ app.delete('/api/coupons/:id', (req, res) => {
         .catch((err) => res.status(500).json({ error: 'Error deleting coupon' }));
 });
 
-// Get coupon interactions (thumbs-up, thumbs-down, click counts)
 app.get('/api/coupons/:id/interactions', (req, res) => {
     const couponId = req.params.id;
 
@@ -182,7 +144,6 @@ app.get('/api/coupons/:id/interactions', (req, res) => {
         .catch((err) => res.status(500).json({ error: 'Error fetching coupon interactions' }));
 });
 
-// Increment click count for a coupon
 app.post('/api/coupons/:id/click', (req, res) => {
     const couponId = req.params.id;
     Coupon.findByIdAndUpdate(couponId, { $inc: { used: 1, today: 1 } })
@@ -190,7 +151,6 @@ app.post('/api/coupons/:id/click', (req, res) => {
         .catch((err) => res.status(500).json({ error: 'Error updating coupon click count' }));
 });
 
-// Increment thumbs-up
 app.post('/api/coupons/:id/thumbs-up', (req, res) => {
     const couponId = req.params.id;
     Coupon.findByIdAndUpdate(couponId, { $inc: { thumbsUp: 1 } })
@@ -198,7 +158,6 @@ app.post('/api/coupons/:id/thumbs-up', (req, res) => {
         .catch(err => res.status(500).json({ error: 'Error recording thumbs up' }));
 });
 
-// Increment thumbs-down
 app.post('/api/coupons/:id/thumbs-down', (req, res) => {
     const couponId = req.params.id;
     Coupon.findByIdAndUpdate(couponId, { $inc: { thumbsDown: 1 } })
